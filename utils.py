@@ -89,6 +89,56 @@ class DeviceDataLoader:
         return len(self.dataloader)
 
 
+#################
+# Face Detector #
+#################
+# The following cell are similar to the facenet-pytorch examples [here](https://github.com/timesler/facenet-pytorch)
+def create_detected_faces_folder(data_dir, batch_size, device):
+    # Define the data loader for the input set of images
+    orig_img_ds = ImageFolder(data_dir, transform=None)
+
+    # overwrites class labels in triplet_dataset with path so path can be used for saving output in mtcnn batches
+    orig_img_ds.samples = [
+        (p, p)
+        for p, _ in orig_img_ds.samples
+    ]
+
+    def collate_pil(x):
+        out_x, out_y = [], []
+        for xx, yy in x:
+            out_x.append(xx)
+            out_y.append(yy)
+        return out_x, out_y
+
+    loader = DataLoader(
+        orig_img_ds,
+        num_workers=4,
+        batch_size=batch_size,
+        collate_fn=collate_pil
+    )
+
+    # Add the face detector model as a transform to the triplet_dataset
+    detector = MTCNN(
+        image_size=160,
+        margin=14,
+        device=device,
+        selection_method='center_weighted_size'
+    )
+
+    crop_paths = []
+    box_probs = []
+    # Create a directory to save the cropped images
+    for i, (x, b_paths) in enumerate(loader):
+        crops = [p.replace(data_dir, data_dir + '_cropped') for p in b_paths]
+        detector(x, save_path=crops)
+        crop_paths.extend(crops)
+        print('\rBatch {} of {}'.format(i + 1, len(loader)), end='')
+
+    # We don't need the detector anymore, so we can delete it to free up memory
+    del detector
+    torch.cuda.empty_cache()
+
+
 ###################
 # Model Utilities #
 ###################
