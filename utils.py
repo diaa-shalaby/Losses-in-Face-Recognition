@@ -3,6 +3,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.utils import make_grid
 import matplotlib.pyplot as plt
+import pandas as pd
+import os
+
+from torch.utils.data import DataLoader
+from torchvision.datasets import ImageFolder
+from facenet_pytorch import MTCNN
 
 
 ##################
@@ -15,6 +21,14 @@ def show_batch(dl):
         ax.set_yticks([])
         ax.imshow(make_grid(images, nrow=16).permute(1, 2, 0))
         break
+
+
+def get_class_distribution(dataset):
+    """Get the distribution of classes in the triplet_dataset"""
+    label_counts = pd.Series(dataset.targets).value_counts().sort_index()
+    dist_class = {label: count for label, count in zip(dataset.classes, label_counts)}
+
+    return dist_class
 
 
 def get_default_device():
@@ -32,7 +46,33 @@ def to_device(data, device):
     return data.to(device, non_blocking=True)
 
 
-class DeviceDataLoader():
+# Utility function
+def create_csv_file(data_dir):
+    """
+    Load all the paths in the lfw_cropped folder and create a dataframe with the paths and labels
+
+    Labels: names of the folders in the lfw_cropped folder
+    Paths: paths to the images in the lfw_cropped folder
+    Dataframe: saved as a csv file
+    """
+    if not os.path.exists("lfw_cropped_annots.csv"):
+        paths = []
+        labels = []
+        for folder in os.listdir(data_dir):
+            for file in os.listdir(os.path.join(data_dir, folder)):
+                paths.append(os.path.join(data_dir, folder, file))
+                labels.append(folder)
+
+        df = pd.DataFrame({"path": paths,
+                           "label": labels})
+
+        # Drop all elements with only one occurrence
+        df = df.groupby("label").filter(lambda x: len(x) > 1)
+
+        df.to_csv("lfw_cropped_annots.csv", index=False)
+
+
+class DeviceDataLoader:
     """Wrap a dataloader to move data to a device"""
 
     def __init__(self, dataloader, device):
@@ -158,7 +198,6 @@ def fit(epochs, lr, model, train_loader, val_loader, opt_func=torch.optim.SGD):
         model.epoch_end(epoch, result)
         history.append(result)
     return history
-
 
 
 ####################
