@@ -16,7 +16,7 @@ def conv_block(in_channels, out_channels, pool=False):
 class ResNet9(ImageClassificationBase):
     def __init__(self, in_channels, num_classes):
         super().__init__()
-        # Input: <batch_size - currently 32> 
+        # Input: <batch_size - currently 32>
         self.conv1 = conv_block(in_channels, 64)                     # bs x 64 x 64 x 64
         self.conv2 = conv_block(64, 128, pool=True)                  # bs x 128 x 32 x 32 
         self.res1 = nn.Sequential(conv_block(128, 128), 
