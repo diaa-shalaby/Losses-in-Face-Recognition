@@ -10,6 +10,8 @@ from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
 from facenet_pytorch import MTCNN
 
+from sklearn.model_selection import train_test_split
+
 
 ##################
 # Data Utilities #
@@ -50,12 +52,15 @@ def to_device(data, device):
 def create_csv_file(data_dir):
     """
     Load all the paths in the lfw_cropped folder and create a dataframe with the paths and labels
+    Split the dataframe into train and test dataframes and save them as csv files
 
     Labels: names of the folders in the lfw_cropped folder
     Paths: paths to the images in the lfw_cropped folder
     Dataframe: saved as a csv file
     """
-    if not os.path.exists("lfw_cropped_annots.csv"):
+    if not os.path.exists("lfw_csvs"):
+        os.mkdir("lfw_csvs")
+        
         paths = []
         labels = []
         for folder in os.listdir(data_dir):
@@ -65,12 +70,22 @@ def create_csv_file(data_dir):
 
         df = pd.DataFrame({"path": paths,
                            "label": labels})
-
-        # Drop all elements with only one occurrence
+        
         df = df.groupby("label").filter(lambda x: len(x) > 1)
+        
+        # Split into train and test
+        train_df, test_df = train_test_split(df, test_size=0.25, stratify=df["label"])
+        
+        # Drop all elements with less than 2 images
+        train_df = train_df.groupby("label").filter(lambda x: len(x) > 1)
+        test_df = test_df.groupby("label").filter(lambda x: len(x) > 1)
 
-        df.to_csv("lfw_cropped_annots.csv", index=False)
-
+        df.to_csv("lfw_csvs/lfw_cropped_annots.csv", index=False)
+        train_df.to_csv("lfw_csvs/lfw_cropped_train.csv", index=False)
+        test_df.to_csv("lfw_csvs/lfw_cropped_test.csv", index=False)
+        
+        print("Created csv files successfully")
+        
 
 class DeviceDataLoader:
     """Wrap a dataloader to move data to a device"""
@@ -92,8 +107,10 @@ class DeviceDataLoader:
 #################
 # Face Detector #
 #################
-# The following cell are similar to the facenet-pytorch examples [here](https://github.com/timesler/facenet-pytorch)
 def create_detected_faces_folder(data_dir, batch_size, device):
+    """The following cell are similar to the facenet-pytorch examples 
+    [here](https://github.com/timesler/facenet-pytorch)
+    """
     # Define the data loader for the input set of images
     orig_img_ds = ImageFolder(data_dir, transform=None)
 
